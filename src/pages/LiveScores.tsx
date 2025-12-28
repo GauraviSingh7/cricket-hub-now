@@ -1,35 +1,31 @@
+import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { useAllMatches } from "@/hooks/use-matches";
+import { fetchAllMatches } from "@/lib/mock-data";
 import MatchCard from "@/components/MatchCard";
 import LoadingState from "@/components/LoadingState";
 import ErrorState from "@/components/ErrorState";
 import EmptyState from "@/components/EmptyState";
 import { Radio, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 
 type FilterStatus = "ALL" | "LIVE" | "UPCOMING" | "FINISHED";
 
 export default function LiveScores() {
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   
-  // Fetch all matches with live polling (10 second intervals)
-  const { 
-    data: matches, 
-    liveMatches,
-    isLoading, 
-    error, 
-    refetch 
-  } = useAllMatches({ pollLive: true, pollInterval: 10000 });
+  const { data: matches, isLoading, error, refetch } = useQuery({
+    queryKey: ["matches"],
+    queryFn: fetchAllMatches,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
-  // Filter matches based on selected status
-  const filteredMatches = useMemo(() => {
-    if (!matches) return [];
-    if (filter === "ALL") return matches;
-    return matches.filter(m => m.status === filter);
-  }, [matches, filter]);
+  const filteredMatches = matches?.filter(m => {
+    if (filter === "ALL") return true;
+    return m.status === filter;
+  }) || [];
 
-  const liveCount = liveMatches.length;
+  const liveCount = matches?.filter(m => m.status === "LIVE").length || 0;
 
   return (
     <>
@@ -94,7 +90,7 @@ export default function LiveScores() {
         {/* Auto-refresh indicator */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6">
           <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-          Auto-refreshing every 10 seconds
+          Auto-refreshing every 30 seconds
         </div>
 
         {/* Matches Grid */}

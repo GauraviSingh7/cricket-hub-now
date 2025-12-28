@@ -1,33 +1,32 @@
+import { useQuery } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import { useAllMatches } from "@/hooks/use-matches";
-import { useTrendingNews } from "@/hooks/use-news";
+import { fetchAllMatches, fetchNews, fetchDiscussions } from "@/lib/mock-data";
 import MatchCard from "@/components/MatchCard";
 import NewsCard from "@/components/NewsCard";
+import DiscussionCard from "@/components/DiscussionCard";
 import LoadingState from "@/components/LoadingState";
 import ErrorState from "@/components/ErrorState";
 import EmptyState from "@/components/EmptyState";
-import { Radio, Newspaper, TrendingUp } from "lucide-react";
+import { Radio, Newspaper, MessageCircle, TrendingUp } from "lucide-react";
 
 export default function Home() {
-  // Fetch all matches with live polling enabled
-  const { 
-    liveMatches, 
-    upcomingMatches, 
-    isLoading: matchesLoading, 
-    error: matchesError, 
-    refetch: refetchMatches 
-  } = useAllMatches({ pollLive: true, pollInterval: 10000 });
+  const { data: matches, isLoading: matchesLoading, error: matchesError, refetch: refetchMatches } = useQuery({
+    queryKey: ["matches"],
+    queryFn: fetchAllMatches,
+  });
 
-  // Fetch trending news
-  const { 
-    data: news, 
-    isLoading: newsLoading, 
-    error: newsError, 
-    refetch: refetchNews 
-  } = useTrendingNews();
+  const { data: news, isLoading: newsLoading, error: newsError, refetch: refetchNews } = useQuery({
+    queryKey: ["news"],
+    queryFn: fetchNews,
+  });
 
-  // Limit displayed items
-  const displayedUpcoming = upcomingMatches.slice(0, 2);
+  const { data: discussions, isLoading: discussionsLoading, error: discussionsError, refetch: refetchDiscussions } = useQuery({
+    queryKey: ["discussions"],
+    queryFn: () => fetchDiscussions(),
+  });
+
+  const liveMatches = matches?.filter(m => m.status === "LIVE") || [];
+  const upcomingMatches = matches?.filter(m => m.status === "UPCOMING").slice(0, 2) || [];
 
   return (
     <>
@@ -74,7 +73,7 @@ export default function Home() {
               ) : liveMatches.length === 0 ? (
                 <div className="bg-card border border-border rounded-lg p-6 text-center">
                   <p className="text-muted-foreground">No live matches at the moment.</p>
-                  {displayedUpcoming.length > 0 && (
+                  {upcomingMatches.length > 0 && (
                     <p className="text-sm text-muted-foreground mt-1">Check the upcoming matches below.</p>
                   )}
                 </div>
@@ -88,19 +87,41 @@ export default function Home() {
             </section>
 
             {/* Upcoming Matches */}
-            {displayedUpcoming.length > 0 && (
+            {upcomingMatches.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="h-5 w-5 text-accent" />
                   <h2 className="font-display text-xl font-bold text-foreground">Coming Up</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {displayedUpcoming.map(match => (
+                  {upcomingMatches.map(match => (
                     <MatchCard key={match.id} match={match} />
                   ))}
                 </div>
               </section>
             )}
+
+            {/* Discussions */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <MessageCircle className="h-5 w-5 text-accent" />
+                <h2 className="font-display text-xl font-bold text-foreground">Fan Discussions</h2>
+              </div>
+              
+              {discussionsLoading ? (
+                <LoadingState message="Loading discussions..." />
+              ) : discussionsError ? (
+                <ErrorState onRetry={() => refetchDiscussions()} />
+              ) : !discussions || discussions.length === 0 ? (
+                <EmptyState title="No discussions yet" message="Be the first to start a conversation." />
+              ) : (
+                <div className="space-y-4">
+                  {discussions.slice(0, 3).map(post => (
+                    <DiscussionCard key={post.id} post={post} />
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
           {/* Sidebar - Right Column */}
